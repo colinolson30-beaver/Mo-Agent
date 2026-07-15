@@ -293,6 +293,11 @@ export default function Chat() {
             &ldquo;Wipe every device in the district&rdquo;
           </div>
         )}
+        {busy && items[items.length - 1]?.kind === "user" && (
+          <div className="typing-indicator">
+            <span /><span /><span />
+          </div>
+        )}
         {items.map((item, i) => {
           switch (item.kind) {
             case "user":
