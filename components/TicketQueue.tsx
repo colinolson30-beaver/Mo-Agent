@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFleet } from "@/lib/store";
 
 interface Ticket {
@@ -9,6 +9,7 @@ interface Ticket {
   submitter: string;
   priority: "high" | "medium" | "low";
   prompt: string;
+  groupKeys?: string[]; // fleet groups to count devices from
 }
 
 const TICKETS: Ticket[] = [
@@ -18,6 +19,7 @@ const TICKETS: Ticket[] = [
     submitter: "Lincoln Middle · IT",
     priority: "high",
     prompt: "Which devices haven't checked in since spring break?",
+    groupKeys: ["LN-C3"],
   },
   {
     id: 2,
@@ -25,6 +27,7 @@ const TICKETS: Ticket[] = [
     submitter: "Maplewood Elementary · Mrs. Torres",
     priority: "high",
     prompt: "Push Google Chrome to the 6th grade carts",
+    groupKeys: ["G6-C1", "G6-C2"],
   },
   {
     id: 3,
@@ -39,9 +42,18 @@ const TICKETS: Ticket[] = [
     submitter: "District IT · Admin",
     priority: "medium",
     prompt: "Push the district WiFi profile to all Lincoln Middle devices",
+    groupKeys: ["LN-C1", "LN-C2", "LN-C3", "LN-C4"],
   },
   {
     id: 5,
+    title: "Graduating seniors — lock all Roosevelt High student devices",
+    submitter: "Principal · Roosevelt High",
+    priority: "medium",
+    prompt: "Lock all Roosevelt High student devices for the graduating class",
+    groupKeys: ["RH-C1", "RH-C2", "RH-C3", "RH-C4", "RH-C5", "RH-C6"],
+  },
+  {
+    id: 6,
     title: "EOY: Factory reset entire district fleet",
     submitter: "Superintendent · Dr. Nguyen",
     priority: "low",
@@ -56,11 +68,30 @@ export default function TicketQueue() {
     Object.fromEntries(TICKETS.map((t) => [t.id, "open" as TicketStatus]))
   );
   const setPendingPrompt = useFleet((s) => s.setPendingPrompt);
+  const setActiveTicketId = useFleet((s) => s.setActiveTicketId);
+  const setResolvedTicketId = useFleet((s) => s.setResolvedTicketId);
+  const resolvedTicketId = useFleet((s) => s.resolvedTicketId);
+  const groups = useFleet((s) => s.groups);
+
+  // When Chat signals a ticket is resolved, flip its status
+  useEffect(() => {
+    if (resolvedTicketId !== null) {
+      setStatuses((prev) => ({ ...prev, [resolvedTicketId]: "resolved" }));
+      setResolvedTicketId(null);
+    }
+  }, [resolvedTicketId, setResolvedTicketId]);
 
   const openCount = Object.values(statuses).filter((s) => s === "open").length;
 
+  const deviceCount = (ticket: Ticket): number | null => {
+    if (!ticket.groupKeys?.length) return null;
+    const groupMap = new Map(groups.map((g) => [g.name, g.deviceIds.length]));
+    return ticket.groupKeys.reduce((sum, k) => sum + (groupMap.get(k) ?? 0), 0);
+  };
+
   const handle = (ticket: Ticket) => {
     setStatuses((prev) => ({ ...prev, [ticket.id]: "in-progress" }));
+    setActiveTicketId(ticket.id);
     setPendingPrompt(ticket.prompt);
   };
 
@@ -73,13 +104,17 @@ export default function TicketQueue() {
       <div className="ticket-list">
         {TICKETS.map((ticket) => {
           const status = statuses[ticket.id];
+          const count = deviceCount(ticket);
           return (
             <div key={ticket.id} className={`ticket-card status-${status}`}>
               <div className="ticket-top">
                 <div className={`ticket-priority-dot priority-${ticket.priority}`} />
                 <div className="ticket-title">{ticket.title}</div>
               </div>
-              <div className="ticket-meta">{ticket.submitter}</div>
+              <div className="ticket-meta">
+                {ticket.submitter}
+                {count !== null && <span className="ticket-count"> · {count} devices</span>}
+              </div>
               <div className="ticket-footer">
                 <span className={`ticket-status ${status}`}>
                   {status === "in-progress" ? "In Progress" : status === "open" ? "Open" : "Resolved"}

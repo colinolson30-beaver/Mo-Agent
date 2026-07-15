@@ -12,6 +12,10 @@ interface FleetState {
   highlight: Highlight;
   pendingPrompt: string | null;
   setPendingPrompt: (p: string | null) => void;
+  resolvedTicketId: number | null;
+  setResolvedTicketId: (id: number | null) => void;
+  activeTicketId: number | null;
+  setActiveTicketId: (id: number | null) => void;
   connect: () => void;
 }
 
@@ -24,6 +28,10 @@ export const useFleet = create<FleetState>((set, get) => ({
   highlight: { deviceIds: [], kind: "none" },
   pendingPrompt: null,
   setPendingPrompt: (p) => set({ pendingPrompt: p }),
+  resolvedTicketId: null,
+  setResolvedTicketId: (id) => set({ resolvedTicketId: id }),
+  activeTicketId: null,
+  setActiveTicketId: (id) => set({ activeTicketId: id }),
 
   connect: () => {
     if (get().connected || typeof window === "undefined") return;

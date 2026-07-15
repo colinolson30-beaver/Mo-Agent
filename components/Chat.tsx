@@ -93,6 +93,8 @@ export default function Chat() {
   const plans = useFleet((s) => s.plans);
   const pendingPrompt = useFleet((s) => s.pendingPrompt);
   const setPendingPrompt = useFleet((s) => s.setPendingPrompt);
+  const setResolvedTicketId = useFleet((s) => s.setResolvedTicketId);
+  const activeTicketId = useFleet((s) => s.activeTicketId);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -206,6 +208,9 @@ export default function Chat() {
       setItems((prev) => [...prev, { kind: "event", text: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
     } finally {
       setBusy(false);
+      if (activeTicketId !== null) {
+        setResolvedTicketId(activeTicketId);
+      }
     }
   };
 
@@ -236,6 +241,11 @@ export default function Chat() {
             &ldquo;Which devices haven&rsquo;t checked in since spring break?&rdquo;<br />
             &ldquo;Push Chrome to the 6th grade carts&rdquo;<br />
             &ldquo;Wipe every device in the district&rdquo;
+          </div>
+        )}
+        {busy && items[items.length - 1]?.kind === "user" && (
+          <div className="typing-indicator">
+            <span /><span /><span />
           </div>
         )}
         {items.map((item, i) => {
