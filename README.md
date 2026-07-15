@@ -14,7 +14,7 @@ npm run demo                        # = next build && next start (use this for d
 
 Open http://localhost:3000.
 
-**No API key needed if you have Claude Code installed and signed in** — without `ANTHROPIC_API_KEY`, the chat automatically proxies through your local Claude app (Claude Agent SDK, in-process fleet tools, your existing Claude login). Set the key in `.env.local` only if you'd rather hit the API directly. The fleet board and the **◉ wave** debug button work with neither.
+**No API key needed if you have Claude Code installed and signed in** — without `ANTHROPIC_API_KEY`, the chat automatically proxies through your local Claude app (Claude Agent SDK, in-process fleet tools, your existing Claude login). Set the key in `.env.local` only if you'd rather hit the API directly. The fleet board and the **Demo wave** debug button work with neither.
 
 ## Timed deployments
 
@@ -42,6 +42,6 @@ curl -X POST http://localhost:3000/api/debug/wave -H "content-type: application/
 
 ## Demo-day notes
 
-- Rehearse with the **◉ wave** button first; it exercises the full choreography with zero AI.
+- Rehearse with the **Demo wave** button first; it exercises the full choreography with zero AI.
 - `npm run demo` (production build), not `npm run dev`.
 - Fallback if the LLM API is down: the wave button covers the visual; a screen recording covers the chat beats.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useFleet } from "@/lib/store";
 import type { Plan } from "@/lib/sim/types";
 
@@ -32,6 +32,58 @@ const TOOL_LABELS: Record<string, string> = {
   erase_device: "planning erase",
 };
 
+// ---- Minimal markdown: **bold**, `code`, bullet lists, paragraphs ----
+
+function inline(text: string, keyBase: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <b key={`${keyBase}-${i}`}>{part.slice(2, -2)}</b>;
+    if (part.startsWith("`") && part.endsWith("`")) return <code key={`${keyBase}-${i}`}>{part.slice(1, -1)}</code>;
+    return <Fragment key={`${keyBase}-${i}`}>{part}</Fragment>;
+  });
+}
+
+function Markdown({ text }: { text: string }) {
+  const blocks: React.ReactNode[] = [];
+  const lines = text.split("\n");
+  let para: string[] = [];
+  let list: string[] = [];
+
+  const flushPara = () => {
+    if (para.length) {
+      blocks.push(<p key={`p${blocks.length}`}>{inline(para.join(" "), `p${blocks.length}`)}</p>);
+      para = [];
+    }
+  };
+  const flushList = () => {
+    if (list.length) {
+      blocks.push(
+        <ul key={`u${blocks.length}`}>
+          {list.map((li, i) => <li key={i}>{inline(li, `li${i}`)}</li>)}
+        </ul>,
+      );
+      list = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const bullet = line.match(/^\s*[-•*]\s+(.*)/);
+    if (bullet) {
+      flushPara();
+      list.push(bullet[1]);
+    } else if (!line.trim()) {
+      flushPara();
+      flushList();
+    } else {
+      flushList();
+      para.push(line.replace(/^#+\s*/, ""));
+    }
+  }
+  flushPara();
+  flushList();
+  return <>{blocks}</>;
+}
+
 export default function Chat() {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [input, setInput] = useState("");
@@ -44,7 +96,7 @@ export default function Chat() {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
   }, [items]);
 
-  // Surface rollout completion (incl. beat-4 failures) as a status card.
+  // Surface rollout completion (incl. failures) as a callout row.
   useEffect(() => {
     for (const p of Object.values(plans)) {
       if (p.status === "completed" && p.resultSummary && !announcedPlans.current.has(p.id)) {
@@ -163,12 +215,14 @@ export default function Chat() {
     });
   };
 
+  const lastToolIdx = items.reduce((acc, it, i) => (it.kind === "tool" ? i : acc), -1);
+
   return (
     <div className="chat">
       <div className="chat-log" ref={logRef}>
         {items.length === 0 && (
-          <div className="tool-note" style={{ alignSelf: "center", textAlign: "center", marginTop: 24, lineHeight: 2 }}>
-            Try:<br />
+          <div className="suggestions">
+            Try asking:<br />
             &ldquo;Which devices haven&rsquo;t checked in since spring break?&rdquo;<br />
             &ldquo;Push Chrome to the 6th grade carts&rdquo;<br />
             &ldquo;Wipe every device in the district&rdquo;
@@ -177,18 +231,31 @@ export default function Chat() {
         {items.map((item, i) => {
           switch (item.kind) {
             case "user":
+              return <div key={i} className="msg user">{item.text}</div>;
             case "assistant":
-              return <div key={i} className={`msg ${item.kind}`}>{item.text}</div>;
-            case "event":
-              return <div key={i} className="msg event">⚑ {item.text}</div>;
+              return <div key={i} className="msg assistant"><Markdown text={item.text} /></div>;
+            case "event": {
+              const isDanger = /^error|failed/i.test(item.text) || item.text.includes("FAILED");
+              return (
+                <div key={i} className={`callout${isDanger ? " danger" : ""}`}>
+                  <span className="icon">{isDanger ? "⚠" : "✓"}</span>
+                  <span>{item.text}</span>
+                </div>
+              );
+            }
             case "tool":
-              return <div key={i} className="tool-note">⚙ {TOOL_LABELS[item.name] ?? item.name}…</div>;
+              return (
+                <div key={i} className="tool-note">
+                  {busy && i === lastToolIdx ? <span className="spinner" /> : <span className="tool-check">✓</span>}
+                  {TOOL_LABELS[item.name] ?? item.name}…
+                </div>
+              );
             case "refusal":
               return (
                 <div key={i} className="refusal-card">
-                  <h4>⛔ Refused by policy: {item.action.replace("_", " ")}</h4>
-                  <div>
-                    Blast radius: <b>{item.blast.device_count} devices</b> across {item.blast.group_count} groups ({item.blast.share_of_district} of the district) — highlighted in red on the board.
+                  <h4>Refused by policy: {item.action.replace(/_/g, " ")}</h4>
+                  <div className="body">
+                    Blast radius: <b>{item.blast.device_count} devices</b> across {item.blast.group_count} groups ({item.blast.share_of_district} of the district) — highlighted on the board.
                   </div>
                   <p>{item.elevationText}</p>
                 </div>
@@ -196,23 +263,26 @@ export default function Chat() {
             case "plan":
               return (
                 <div key={i} className="plan-card">
-                  <h4>⚡ Plan: {item.plan.label}</h4>
+                  <h4>
+                    {item.plan.label}
+                    {!item.resolved && <span className="pill warn">Awaiting approval</span>}
+                  </h4>
                   <ul>
                     <li><b>{item.blast.device_count} devices</b> in {item.blast.group_count} group{item.blast.group_count === 1 ? "" : "s"}: {item.blast.groups.join(", ")}</li>
-                    <li>Est. bandwidth ~{item.blast.est_bandwidth_gb} GB · rollout: {item.rollout}</li>
+                    <li>Est. bandwidth ~{item.blast.est_bandwidth_gb} GB · {item.rollout}</li>
                     {typeof item.plan.payload?.remove_after_hours === "number" && (
-                      <li>⏱ Timed deploy: auto-removes after {String(item.plan.payload.remove_after_hours)}h (compressed demo clock)</li>
+                      <li>Timed deploy: auto-removes after {String(item.plan.payload.remove_after_hours)}h (compressed demo clock)</li>
                     )}
                     {item.offlineQueued > 0 && <li>{item.offlineQueued} offline device{item.offlineQueued === 1 ? "" : "s"} queued for next check-in</li>}
                   </ul>
                   {item.resolved ? (
-                    <div className="resolved">{item.resolved === "approved" ? "✔ Approved" : "✕ Cancelled"}</div>
+                    <div className="resolved">{item.resolved === "approved" ? "✓ Approved" : "✕ Cancelled"}</div>
                   ) : (
                     <div className="buttons">
-                      <button className="primary" onClick={() => decide(i, item.plan.id, "approve")}>
+                      <button className="btn-primary" onClick={() => decide(i, item.plan.id, "approve")}>
                         Approve — {item.blast.device_count} devices
                       </button>
-                      <button onClick={() => decide(i, item.plan.id, "cancel")}>Cancel</button>
+                      <button className="btn-secondary" onClick={() => decide(i, item.plan.id, "cancel")}>Cancel</button>
                     </div>
                   )}
                 </div>
@@ -228,7 +298,7 @@ export default function Chat() {
           placeholder="Ask about or command your fleet…"
           disabled={busy}
         />
-        <button onClick={send} disabled={busy || !input.trim()}>➤</button>
+        <button onClick={send} disabled={busy || !input.trim()} aria-label="Send">➤</button>
       </div>
     </div>
   );

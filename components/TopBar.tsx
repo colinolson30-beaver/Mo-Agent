@@ -12,16 +12,21 @@ export default function TopBar() {
   return (
     <div className="topbar">
       <div className="brand">
-        ▦ <span>FleetPilot</span>
+        <span className="mark">▦</span>
+        <span className="name">FleetPilot</span>
         <small>Maplewood School District</small>
       </div>
-      <div className="stat"><b>{stats.total}</b><label>devices</label></div>
-      <div className="stat"><b>{stats.online}</b><label>online</label></div>
-      <div className="stat pending"><b>{stats.pendingCommands}</b><label>pending</label></div>
-      <div className="stat failed"><b>{stats.failed}</b><label>failed</label></div>
-      {/* Hidden-in-plain-sight debug button: tunes the wave with zero AI */}
+      <div className="stat"><label>Devices</label><b>{stats.total}</b></div>
+      <div className="stat"><label>Online</label><b>{stats.online}</b></div>
+      <div className={`stat pending${stats.pendingCommands > 0 ? " nonzero" : ""}`}>
+        <label>Pending</label><b>{stats.pendingCommands}</b>
+      </div>
+      <div className={`stat failed${stats.failed > 0 ? " nonzero" : ""}`}>
+        <label>Failed</label><b>{stats.failed}</b>
+      </div>
+      {/* Demo wave: runs the full rollout choreography with no AI involved */}
       <button className="debug-btn" onClick={debugWave} title="Trigger a demo wave with no AI involved">
-        ◉ wave
+        Demo wave
       </button>
     </div>
   );
