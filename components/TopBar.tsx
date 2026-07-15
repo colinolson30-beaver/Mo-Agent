@@ -12,8 +12,8 @@ export default function TopBar() {
   return (
     <div className="topbar">
       <div className="brand">
-        <span className="mark">▦</span>
-        <span className="name">FleetPilot</span>
+        <div className="brand-logo">Mo</div>
+        <span className="name">Mo</span>
         <small>Maplewood School District</small>
       </div>
       <div className="stat"><label>Devices</label><b>{stats.total}</b></div>

@@ -10,6 +10,8 @@ interface FleetState {
   stats: Stats;
   plans: Record<string, Plan>;
   highlight: Highlight;
+  pendingPrompt: string | null;
+  setPendingPrompt: (p: string | null) => void;
   connect: () => void;
 }
 
@@ -20,6 +22,8 @@ export const useFleet = create<FleetState>((set, get) => ({
   stats: { total: 0, online: 0, pendingCommands: 0, failed: 0 },
   plans: {},
   highlight: { deviceIds: [], kind: "none" },
+  pendingPrompt: null,
+  setPendingPrompt: (p) => set({ pendingPrompt: p }),
 
   connect: () => {
     if (get().connected || typeof window === "undefined") return;

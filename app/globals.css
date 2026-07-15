@@ -63,9 +63,15 @@ button:focus-visible, input:focus-visible {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: baseline; gap: 8px; margin-right: 8px; }
-.brand .mark { color: var(--accent); font-size: 15px; }
-.brand .name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: 8px; }
+.brand-logo {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, #0a84ff 0%, #34c759 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff; letter-spacing: -0.3px;
+  flex-shrink: 0;
+}
+.brand .name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .brand small { font-size: 12.5px; font-weight: 400; color: var(--text-secondary); }
 
 .stat { display: flex; flex-direction: column; gap: 1px; }
@@ -87,8 +93,8 @@ button:focus-visible, input:focus-visible {
 }
 .debug-btn:hover { background: var(--bg-subtle); color: var(--text-primary); }
 
-/* ---- Two panes: chat surface + fleet canvas, hairline divider ---- */
-.main { display: flex; flex: 1; min-height: 0; }
+/* ---- Three panes: ticket queue + chat + fleet canvas ---- */
+.main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
 .chat {
   width: 400px;
@@ -408,3 +414,69 @@ button:focus-visible, input:focus-visible {
 }
 .composer button:hover { background: var(--accent-hover); }
 .composer button:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Ticket Queue ---- */
+.ticket-queue {
+  width: 256px; min-width: 256px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+}
+.ticket-queue-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ticket-queue-header h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-tertiary); font-weight: 600;
+}
+.tq-badge {
+  background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 700; border-radius: 999px;
+  padding: 1px 7px; min-width: 20px; text-align: center;
+}
+.ticket-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ticket-card {
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  display: flex; flex-direction: column; gap: 5px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.ticket-card:not(.status-resolved):not(.status-in-progress):hover {
+  background: var(--bg-subtle);
+}
+.ticket-card.status-in-progress {
+  background: var(--warning-bg);
+  border-color: rgba(247,144,9,0.3);
+}
+.ticket-card.status-resolved { opacity: 0.4; pointer-events: none; }
+
+.ticket-top { display: flex; align-items: flex-start; gap: 8px; }
+.ticket-priority-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.priority-high { background: var(--danger); }
+.priority-medium { background: var(--warning); }
+.priority-low { background: var(--text-tertiary); }
+.ticket-title { font-size: 12.5px; line-height: 1.45; font-weight: 500; color: var(--text-primary); flex: 1; }
+.ticket-meta { font-size: 11px; color: var(--text-tertiary); padding-left: 14px; }
+.ticket-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-left: 14px; margin-top: 2px;
+}
+.ticket-status {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+}
+.ticket-status.open { background: var(--accent-subtle); color: var(--accent); }
+.ticket-status.in-progress { background: var(--warning-bg); color: var(--warning); }
+.ticket-status.resolved { background: var(--success-bg); color: var(--success); }
+.ticket-handle-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  background: var(--accent); color: #fff; border: none; font-weight: 600;
+  transition: background 120ms ease;
+}
+.ticket-handle-btn:hover { background: var(--accent-hover); }

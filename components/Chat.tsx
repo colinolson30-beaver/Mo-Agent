@@ -91,6 +91,8 @@ export default function Chat() {
   const logRef = useRef<HTMLDivElement>(null);
   const announcedPlans = useRef(new Set<string>());
   const plans = useFleet((s) => s.plans);
+  const pendingPrompt = useFleet((s) => s.pendingPrompt);
+  const setPendingPrompt = useFleet((s) => s.setPendingPrompt);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -114,10 +116,18 @@ export default function Chat() {
         content: (i as { text: string }).text,
       }));
 
-  const send = async () => {
-    const text = input.trim();
+  useEffect(() => {
+    if (pendingPrompt && !busy) {
+      setPendingPrompt(null);
+      send(pendingPrompt);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt]);
+
+  const send = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || busy) return;
-    setInput("");
+    if (!overrideText) setInput("");
     setBusy(true);
 
     const base: ChatItem[] = [...items, { kind: "user", text }];
@@ -294,11 +304,11 @@ export default function Chat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          onKeyDown={(e) => e.key === "Enter" && send(undefined)}
           placeholder="Ask about or command your fleet…"
           disabled={busy}
         />
-        <button onClick={send} disabled={busy || !input.trim()} aria-label="Send">➤</button>
+        <button onClick={() => send(undefined)} disabled={busy || !input.trim()} aria-label="Send">➤</button>
       </div>
     </div>
   );
