@@ -14,7 +14,7 @@ npm run demo                        # = next build && next start (use this for d
 
 Open http://localhost:3000.
 
-Without an API key the fleet board and the **◉ wave** debug button (top right) still work — only the chat needs the key.
+**No API key needed if you have Claude Code installed and signed in** — without `ANTHROPIC_API_KEY`, the chat automatically proxies through your local Claude app (Claude Agent SDK, in-process fleet tools, your existing Claude login). Set the key in `.env.local` only if you'd rather hit the API directly. The fleet board and the **◉ wave** debug button work with neither.
 
 ## Timed deployments
 
@@ -37,7 +37,7 @@ curl -X POST http://localhost:3000/api/debug/wave -H "content-type: application/
 
 - `lib/sim/` — in-memory district simulator. Deterministic seed, command lifecycle state machine (queued → pushed → acknowledged → done/failed), canary-then-fanout rollout policy, singleton on `globalThis`.
 - `lib/agent/` — 9 tool definitions + executor. The guardrail policy table is enforced in the executor, not the prompt: a refuse-cell call registers no plan and returns `{refused, blast_radius, elevation_text}`. A misbehaving model is a narration bug, never a safety bug.
-- `app/api/chat` — streaming Claude tool loop (`claude-sonnet-5`; override with `FLEETPILOT_MODEL`). Mutating tools register plans; execution happens only via `app/api/approve` (no LLM in the execution path). Reads `ANTHROPIC_API_KEY` from `.env.local`.
+- `app/api/chat` — two agent backends, same wire protocol: with `ANTHROPIC_API_KEY`, a direct streaming Claude tool loop (`claude-sonnet-5`; override with `FLEETPILOT_MODEL`); without it, `lib/agent/localApp.ts` runs the turn through the locally installed Claude Code app (Agent SDK, `mcp__fleet__*` tools only, no built-ins). Either way, mutating tools register plans; execution happens only via `app/api/approve` (no LLM in the execution path).
 - `app/api/events` — SSE: snapshot + deltas → zustand → CSS-transition tile grid.
 
 ## Demo-day notes

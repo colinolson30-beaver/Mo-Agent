@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { TOOLS, executeTool } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/prompt";
 import { getSimulator } from "@/lib/sim/simulator";
+import { runLocalAppTurn } from "@/lib/agent/localApp";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -16,16 +17,40 @@ interface ClientMessage {
 }
 
 export async function POST(req: NextRequest) {
+  const { messages: clientMessages } = (await req.json()) as { messages: ClientMessage[] };
+  const sim = getSimulator();
+
+  // No API key? Proxy through the locally installed Claude Code app instead
+  // (Claude Agent SDK — uses the machine's existing Claude login).
   if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not set. The fleet board and debug wave still work; the agent needs the key." }),
-      { status: 500, headers: { "content-type": "application/json" } },
-    );
+    const pendingLocal = sim.pendingPlan();
+    if (pendingLocal) sim.cancelPlan(pendingLocal.id);
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+        try {
+          await runLocalAppTurn(clientMessages, send);
+          send({ type: "done" });
+        } catch (err) {
+          send({
+            type: "error",
+            message:
+              `Local Claude app path failed: ${err instanceof Error ? err.message : String(err)}. ` +
+              `Either sign in to Claude Code on this machine, or set ANTHROPIC_API_KEY in .env.local.`,
+          });
+        } finally {
+          controller.close();
+        }
+      },
+    });
+    return new Response(stream, {
+      headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache" },
+    });
   }
 
-  const { messages: clientMessages } = (await req.json()) as { messages: ClientMessage[] };
   const client = new Anthropic();
-  const sim = getSimulator();
 
   // A new user message discards any unapproved plan (plan lifecycle rule).
   const pending = sim.pendingPlan();
