@@ -26,10 +26,11 @@ const Tile = memo(function Tile({ device, hl, compact }: { device: Device; hl: H
   return (
     <div
       className={tileClass(device, hl, compact)}
-      title={`${device.name} · ${device.room} · ${device.status}${device.activeCommand ? ` · ${device.activeCommand.label}: ${device.activeCommand.state}` : ""}`}
+      title={`${device.name} · ${device.room} · ${device.status}${device.contentFilter ? ` · ${device.contentFilter.name} (${device.contentFilter.urlCount} URLs blocked)` : ""}${device.activeCommand ? ` · ${device.activeCommand.label}: ${device.activeCommand.state}` : ""}`}
     >
       {!compact && device.name.slice(device.group.length + 1)}
       <span className="dot" />
+      {device.contentFilter && !compact && <span className="shield">⛨</span>}
     </div>
   );
 });
@@ -42,7 +43,7 @@ const GroupCard = memo(function GroupCard({ group, devices, highlightIds, highli
 }) {
   const compact = group.deviceIds.length > COMPACT_THRESHOLD;
 
-  let online = 0, offline = 0, updating = 0, failed = 0;
+  let online = 0, offline = 0, updating = 0, failed = 0, filtered = 0;
   for (const id of group.deviceIds) {
     const d = devices[id];
     if (!d) continue;
@@ -51,6 +52,7 @@ const GroupCard = memo(function GroupCard({ group, devices, highlightIds, highli
     if (cmd?.state === "failed") failed++;
     if (d.status === "online") online++;
     else offline++;
+    if (d.contentFilter) filtered++;
   }
 
   return (
@@ -63,6 +65,7 @@ const GroupCard = memo(function GroupCard({ group, devices, highlightIds, highli
           {offline > 0 && <span className="pill off">{offline} offline</span>}
           {updating > 0 && <span className="pill warn">{updating} updating</span>}
           {failed > 0 && <span className="pill bad">{failed} failed</span>}
+          {filtered > 0 && <span className="pill filter">⛨ {filtered} filtered</span>}
         </span>
       </div>
       <div className="tiles">
@@ -142,6 +145,7 @@ export default function FleetGrid() {
         <span><i style={{ background: "transparent", border: "1.5px solid var(--text-tertiary)" }} />Offline</span>
         <span><i style={{ background: "var(--warning)" }} />Updating</span>
         <span><i style={{ background: "var(--danger)" }} />Failed</span>
+        <span><i style={{ background: "var(--accent)" }} />⛨ Content filtered</span>
       </div>
     </div>
   );

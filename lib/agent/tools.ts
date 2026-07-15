@@ -33,6 +33,7 @@ export const TOOLS: Anthropic.Tool[] = [
         has_app: { type: "string", description: "Devices that HAVE this app installed." },
         missing_app: { type: "string", description: "Devices MISSING this app." },
         locked: { type: "boolean" },
+        has_content_filter: { type: "boolean", description: "Devices that DO (true) or do NOT (false) have a content filter applied." },
       },
     },
   },
@@ -63,6 +64,33 @@ export const TOOLS: Anthropic.Tool[] = [
         remove_after_hours: { type: "number", description: "Optional. Automatically remove the app this many hours after a successful deploy. The removal is covered by the same approval." },
       },
       required: ["app_name", "target"],
+    },
+  },
+  {
+    name: "create_blacklist",
+    description:
+      "Create (or replace) a named URL blocklist in the MDM console. Executes immediately — it only saves configuration, no devices are touched. When asked to block a category of sites (e.g. popular gaming sites), identify the URLs yourself and pass them here, then push with push_content_filter.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Blocklist name, e.g. 'Gaming Sites Blacklist'." },
+        category: { type: "string", description: "Optional category tag, e.g. 'gaming'." },
+        urls: { type: "array", items: { type: "string" }, description: "Domains to block, e.g. ['roblox.com','coolmathgames.com']." },
+      },
+      required: ["name", "urls"],
+    },
+  },
+  {
+    name: "push_content_filter",
+    description:
+      "Push a content-filter (web block) built from an existing blocklist to target devices. Create the blocklist first with create_blacklist. Registers a plan requiring human approval.",
+    input_schema: {
+      type: "object",
+      properties: {
+        blacklist_name: { type: "string", description: "Name of a blocklist previously created with create_blacklist." },
+        target: TARGET_SCHEMA,
+      },
+      required: ["blacklist_name", "target"],
     },
   },
   {
@@ -174,7 +202,7 @@ function evaluatePolicy(sim: Simulator, action: ActionKind, deviceIds: string[],
   const fleetWide = deviceIds.length > sim.devices.size / 2;
   if (action === "erase_device") return fleetWide || groupCount > 1 ? "refuse" : "plan";
   if (action === "lock_device") return fleetWide ? "refuse" : "plan";
-  return "plan"; // install_app, push_profile, send_message
+  return "plan"; // install_app, push_profile, push_content_filter, send_message
 }
 
 const ELEVATION_TEXT =
@@ -186,6 +214,7 @@ function deviceBrief(d: Device) {
   return {
     id: d.id, name: d.name, group: d.group, school: d.school, room: d.room,
     status: d.status, locked: d.locked,
+    content_filter: d.contentFilter ? `${d.contentFilter.name} (${d.contentFilter.urlCount} URLs)` : null,
     last_check_in: new Date(d.lastCheckIn).toISOString(),
     days_since_check_in: Math.round((Date.now() - d.lastCheckIn) / DAY * 10) / 10,
     os: d.os, apps: d.apps,
@@ -208,6 +237,7 @@ function labelFor(action: ActionKind, input: Record<string, unknown>): string {
     case "install_app":
       return `Install ${input.app_name}` + (input.remove_after_hours ? ` — auto-remove after ${input.remove_after_hours}h` : "");
     case "push_profile": return `Push profile: ${input.profile_name}`;
+    case "push_content_filter": return `Content filter: ${input.blacklist_name} — block ${input.url_count} URLs`;
     case "lock_device": return "Remote lock";
     case "send_message": return "Send on-screen message";
     case "erase_device": return "FACTORY ERASE";
@@ -251,6 +281,7 @@ export function executeTool(name: string, rawInput: unknown): string {
         if (input.has_app) results = results.filter((d) => d.apps.some((a) => norm(a).includes(norm(String(input.has_app)))));
         if (input.missing_app) results = results.filter((d) => !d.apps.some((a) => norm(a).includes(norm(String(input.missing_app)))));
         if (typeof input.locked === "boolean") results = results.filter((d) => d.locked === input.locked);
+        if (typeof input.has_content_filter === "boolean") results = results.filter((d) => !!d.contentFilter === input.has_content_filter);
 
         if (results.length > 0 && results.length <= 120) sim.setHighlight(results.map((d) => d.id), "info");
 
@@ -287,12 +318,41 @@ export function executeTool(name: string, rawInput: unknown): string {
         });
       }
 
+      case "create_blacklist": {
+        const urls = [...new Set((input.urls as string[] ?? []).map((u) => String(u).trim().toLowerCase()).filter(Boolean))];
+        if (urls.length === 0) return JSON.stringify({ error: "Provide at least one URL to block." });
+        const bl = { name: String(input.name), category: input.category ? String(input.category) : undefined, urls, createdAt: Date.now() };
+        const replaced = sim.blacklists.has(bl.name);
+        sim.blacklists.set(bl.name, bl);
+        return JSON.stringify({
+          [replaced ? "replaced" : "created"]: true,
+          name: bl.name,
+          category: bl.category,
+          url_count: urls.length,
+          urls,
+          note: "Blocklist saved in the console. No devices affected yet — use push_content_filter to deploy it.",
+        });
+      }
+
       case "install_app":
       case "push_profile":
+      case "push_content_filter":
       case "lock_device":
       case "send_message":
       case "erase_device": {
         const action = name as ActionKind;
+
+        if (action === "push_content_filter") {
+          const bl = sim.blacklists.get(String(input.blacklist_name));
+          if (!bl) {
+            return JSON.stringify({
+              error: `No blocklist named "${input.blacklist_name}". Create it first with create_blacklist.`,
+              existing_blacklists: [...sim.blacklists.keys()],
+            });
+          }
+          input.url_count = bl.urls.length; // stamped into the payload for the plan label + device effect
+        }
+
         const { deviceIds, groupNames, error } = resolveTarget(sim, (input.target ?? {}) as Target);
         if (error) return JSON.stringify({ error });
 

@@ -1,6 +1,6 @@
 // No-API-key path: run the agent through the locally installed Claude Code
 // app (Claude Agent SDK). Auth comes from the user's existing Claude login;
-// the 9 fleet tools run in-process against the same simulator singleton.
+// the 11 fleet tools run in-process against the same simulator singleton.
 import { query, tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { executeTool } from "@/lib/agent/tools";
@@ -49,6 +49,7 @@ function buildFleetServer(send: Send) {
         has_app: z.string().optional().describe("Devices that HAVE this app installed."),
         missing_app: z.string().optional().describe("Devices MISSING this app."),
         locked: z.boolean().optional(),
+        has_content_filter: z.boolean().optional().describe("Devices that DO (true) or do NOT (false) have a content filter applied."),
       }, run(send, "search_devices")),
       tool("list_groups", "List every device group (carts and staff sets) with school, room, and device counts. Call this first when unsure of exact group names.", {}, run(send, "list_groups")),
       tool("get_device", "Full detail for one device by ID.", { device_id: z.string() }, run(send, "get_device")),
@@ -60,6 +61,15 @@ function buildFleetServer(send: Send) {
         target: targetShape,
         remove_after_hours: z.number().optional().describe("Optional. Automatically remove the app this many hours after a successful deploy. Covered by the same approval."),
       }, run(send, "install_app")),
+      tool("create_blacklist", "Create (or replace) a named URL blocklist in the MDM console. Executes immediately — it only saves configuration, no devices are touched. When asked to block a category of sites (e.g. popular gaming sites), identify the URLs yourself and pass them here, then push with push_content_filter.", {
+        name: z.string().describe("Blocklist name, e.g. 'Gaming Sites Blacklist'."),
+        category: z.string().optional().describe("Optional category tag, e.g. 'gaming'."),
+        urls: z.array(z.string()).describe("Domains to block, e.g. ['roblox.com','coolmathgames.com']."),
+      }, run(send, "create_blacklist")),
+      tool("push_content_filter", "Push a content-filter (web block) built from an existing blocklist to target devices. Create the blocklist first with create_blacklist. Registers a plan requiring human approval.", {
+        blacklist_name: z.string().describe("Name of a blocklist previously created with create_blacklist."),
+        target: targetShape,
+      }, run(send, "push_content_filter")),
       tool("push_profile", "Push a configuration profile (e.g. content filter, Wi-Fi, restrictions) to target devices. Registers a plan requiring human approval.", {
         profile_name: z.string().describe("e.g. 'CIPA Content Filter'"),
         target: targetShape,

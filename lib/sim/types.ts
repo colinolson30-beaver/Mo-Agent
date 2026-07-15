@@ -7,9 +7,19 @@ export type ActionKind =
   | "install_app"
   | "remove_app"
   | "push_profile"
+  | "push_content_filter"
   | "lock_device"
   | "send_message"
   | "erase_device";
+
+// A named URL blocklist created by the agent (create_blacklist), then pushed
+// to devices as a content-filter payload (push_content_filter).
+export interface Blacklist {
+  name: string;
+  category?: string;
+  urls: string[];
+  createdAt: number;
+}
 
 export interface Device {
   id: string;
@@ -22,6 +32,7 @@ export interface Device {
   os: string;
   apps: string[];
   locked: boolean;
+  contentFilter?: { name: string; urlCount: number };
   // Beat 4 seed: acks and fails the first install, then stops checking in,
   // so the retry sits queued. The only bespoke seed behavior in the district.
   failInstallThenOffline?: boolean;

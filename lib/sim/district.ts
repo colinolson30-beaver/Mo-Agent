@@ -71,7 +71,9 @@ export function generateDistrict(now: number): { devices: Map<string, Device>; g
         locked: false,
       });
     }
-    groups.set(cart.name, { name: cart.name, school: cart.school, kind: "cart", room: cart.room, deviceIds: ids, aliases: cart.aliases });
+    // Teachers say "class" as often as "cart" — mirror every cart alias.
+    const aliases = [...cart.aliases, ...cart.aliases.map((a) => a.replace("cart", "class"))];
+    groups.set(cart.name, { name: cart.name, school: cart.school, kind: "cart", room: cart.room, deviceIds: ids, aliases });
   }
 
   // Roosevelt staff: 180 one-to-one MacBooks

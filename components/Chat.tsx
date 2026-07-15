@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useFleet } from "@/lib/store";
+import { TICKETS } from "@/lib/tickets";
 import type { Plan } from "@/lib/sim/types";
 
 interface BlastRadius {
@@ -17,7 +18,7 @@ type ChatItem =
   | { kind: "assistant"; text: string }
   | { kind: "tool"; name: string }
   | { kind: "event"; text: string }
-  | { kind: "plan"; plan: Plan; blast: BlastRadius; rollout: string; offlineQueued: number; resolved?: "approved" | "cancelled" }
+  | { kind: "plan"; plan: Plan; blast: BlastRadius; rollout: string; offlineQueued: number; resolved?: "approved" | "cancelled" | "auto-approved" }
   | { kind: "refusal"; action: string; blast: BlastRadius; elevationText: string };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -26,6 +27,8 @@ const TOOL_LABELS: Record<string, string> = {
   get_device: "looking up device",
   get_command_status: "checking rollout status",
   install_app: "planning app install",
+  create_blacklist: "creating URL blocklist",
+  push_content_filter: "planning content filter push",
   push_profile: "planning profile push",
   lock_device: "planning remote lock",
   send_message: "planning message",
@@ -90,9 +93,15 @@ export default function Chat() {
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const announcedPlans = useRef(new Set<string>());
+  const autoApproved = useRef(new Set<string>());
   const plans = useFleet((s) => s.plans);
   const pendingPrompt = useFleet((s) => s.pendingPrompt);
   const setPendingPrompt = useFleet((s) => s.setPendingPrompt);
+  const autopilot = useFleet((s) => s.autopilot);
+  const activeTicketId = useFleet((s) => s.activeTicketId);
+  const setActiveTicketId = useFleet((s) => s.setActiveTicketId);
+  const ticketStatuses = useFleet((s) => s.ticketStatuses);
+  const setTicketStatus = useFleet((s) => s.setTicketStatus);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -209,7 +218,7 @@ export default function Chat() {
     }
   };
 
-  const decide = async (idx: number, planId: string, decision: "approve" | "cancel") => {
+  const decide = async (idx: number, planId: string, decision: "approve" | "cancel", auto = false) => {
     const res = await fetch("/api/approve", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -219,11 +228,57 @@ export default function Chat() {
     setItems((prev) => {
       const next = [...prev];
       const item = next[idx];
-      if (item?.kind === "plan") next[idx] = { ...item, resolved: decision === "approve" ? "approved" : "cancelled" };
-      next.push({ kind: "event", text: result.message });
+      if (item?.kind === "plan") {
+        next[idx] = { ...item, resolved: auto ? "auto-approved" : decision === "approve" ? "approved" : "cancelled" };
+      }
+      next.push({ kind: "event", text: (auto ? "Autopilot: " : "") + result.message });
       return next;
     });
   };
+
+  // ---- Full autopilot ----
+
+  // 1. Approve any pending plan card. Items are append-only, so an item's
+  //    index is still valid when the timeout fires.
+  useEffect(() => {
+    if (!autopilot) return;
+    items.forEach((item, idx) => {
+      if (item.kind !== "plan" || item.resolved || autoApproved.current.has(item.plan.id)) return;
+      autoApproved.current.add(item.plan.id);
+      // Brief pause so the audience sees the plan before it's approved.
+      setTimeout(() => decide(idx, item.plan.id, "approve", true), 900);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autopilot, items]);
+
+  // 2. Close out the active ticket once its chat turn is done and any plan it
+  //    produced has been decided. A policy refusal marks the ticket blocked
+  //    instead — autopilot never overrides the guardrail. Runs in manual mode
+  //    too, so hand-approved tickets also flip to Resolved.
+  useEffect(() => {
+    if (busy || activeTicketId == null) return;
+    const lastUser = items.reduce((acc, it, i) => (it.kind === "user" ? i : acc), -1);
+    if (lastUser < 0) return;
+    const turn = items.slice(lastUser + 1);
+    if (turn.some((it) => it.kind === "plan" && !it.resolved)) return; // awaiting a decision
+    setTicketStatus(activeTicketId, turn.some((it) => it.kind === "refusal") ? "blocked" : "resolved");
+    setActiveTicketId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, items, activeTicketId]);
+
+  // 3. Feed the next open ticket into the chat once the previous one is done.
+  useEffect(() => {
+    if (!autopilot || busy || activeTicketId != null || pendingPrompt) return;
+    const next = TICKETS.find((t) => ticketStatuses[t.id] === "open");
+    if (!next) return;
+    const timer = setTimeout(() => {
+      setTicketStatus(next.id, "in-progress");
+      setActiveTicketId(next.id);
+      setPendingPrompt(next.prompt);
+    }, 1100);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autopilot, busy, activeTicketId, pendingPrompt, ticketStatuses]);
 
   const lastToolIdx = items.reduce((acc, it, i) => (it.kind === "tool" ? i : acc), -1);
 
@@ -286,7 +341,9 @@ export default function Chat() {
                     {item.offlineQueued > 0 && <li>{item.offlineQueued} offline device{item.offlineQueued === 1 ? "" : "s"} queued for next check-in</li>}
                   </ul>
                   {item.resolved ? (
-                    <div className="resolved">{item.resolved === "approved" ? "✓ Approved" : "✕ Cancelled"}</div>
+                    <div className={`resolved${item.resolved === "auto-approved" ? " auto" : ""}`}>
+                      {item.resolved === "auto-approved" ? "✓ Auto-approved — Full Autopilot" : item.resolved === "approved" ? "✓ Approved" : "✕ Cancelled"}
+                    </div>
                   ) : (
                     <div className="buttons">
                       <button className="btn-primary" onClick={() => decide(i, item.plan.id, "approve")}>

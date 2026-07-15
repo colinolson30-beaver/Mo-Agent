@@ -1,6 +1,6 @@
 import { generateDistrict, districtCalendar } from "./district";
 import type {
-  ActionKind, Command, CommandState, Device, Group, Highlight, Plan, SimEvent, Stats,
+  ActionKind, Blacklist, Command, CommandState, Device, Group, Highlight, Plan, SimEvent, Stats,
 } from "./types";
 
 const CANARY_SIZE = 5;
@@ -20,6 +20,7 @@ export class Simulator {
   groups: Map<string, Group>;
   plans = new Map<string, Plan>();
   commands = new Map<string, Command>();
+  blacklists = new Map<string, Blacklist>();
   private listeners = new Set<Listener>();
   private timer: ReturnType<typeof setInterval>;
   private lastHighlight: Highlight = { deviceIds: [], kind: "none" };
@@ -255,11 +256,18 @@ export class Simulator {
     } else if (cmd.action === "remove_app") {
       const app = String((this.plans.get(cmd.planId)?.payload.app_name as string) ?? "");
       device.apps = device.apps.filter((a) => a.toLowerCase() !== app.toLowerCase());
+    } else if (cmd.action === "push_content_filter") {
+      const payload = this.plans.get(cmd.planId)?.payload ?? {};
+      device.contentFilter = {
+        name: String(payload.blacklist_name ?? "Content Filter"),
+        urlCount: Number(payload.url_count ?? 0),
+      };
     } else if (cmd.action === "lock_device") {
       device.locked = true;
     } else if (cmd.action === "erase_device") {
       device.apps = [];
       device.locked = true;
+      delete device.contentFilter;
     }
     // push_profile / send_message: no lasting visible state beyond the green sweep
   }

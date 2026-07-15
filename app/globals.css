@@ -80,18 +80,39 @@ button:focus-visible, input:focus-visible {
 .stat.pending.nonzero b { color: var(--warning); }
 .stat.failed.nonzero b { color: var(--danger); }
 
-.debug-btn {
+.autopilot-toggle {
   margin-left: auto;
+  display: flex; align-items: center; gap: 8px;
   background: var(--bg-surface);
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 6px 14px;
-  font-size: 12.5px;
+  border-radius: 999px;
+  padding: 6px 14px 6px 8px;
+  font-size: 12px; font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
-.debug-btn:hover { background: var(--bg-subtle); color: var(--text-primary); }
+.autopilot-toggle:hover { background: var(--bg-subtle); color: var(--text-primary); }
+.autopilot-toggle .track {
+  width: 30px; height: 16px; border-radius: 999px;
+  background: #d5dae3; position: relative; flex-shrink: 0;
+  transition: background 150ms ease;
+}
+.autopilot-toggle .knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2);
+  transition: left 150ms ease;
+}
+.autopilot-toggle.on {
+  background: var(--success-bg);
+  border-color: rgba(18, 183, 106, 0.4);
+  color: var(--success);
+}
+.autopilot-toggle.on:hover { background: var(--success-bg); color: var(--success); }
+.autopilot-toggle.on .track { background: var(--success); }
+.autopilot-toggle.on .knob { left: 16px; }
 
 /* ---- Three panes: ticket queue + chat + fleet canvas ---- */
 .main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
@@ -147,6 +168,7 @@ button:focus-visible, input:focus-visible {
 .pill.off { background: var(--bg-subtle); color: var(--text-secondary); }
 .pill.warn { background: var(--warning-bg); color: var(--warning); }
 .pill.bad { background: var(--danger-bg); color: var(--danger); }
+.pill.filter { background: var(--accent-subtle); color: var(--accent); }
 
 /* ---- Device chips ---- */
 .tiles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
@@ -178,6 +200,14 @@ button:focus-visible, input:focus-visible {
 }
 
 .tile.online .dot { background: var(--success); }
+
+.tile .shield {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-left: -2px;
+}
 
 .tile.offline {
   opacity: 0.55;
@@ -337,6 +367,7 @@ button:focus-visible, input:focus-visible {
 .plan-card ul { margin: 10px 0 12px 18px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.7; list-style: disc; }
 .plan-card .buttons { display: flex; gap: 8px; }
 .plan-card .resolved { color: var(--text-secondary); font-size: 12.5px; margin-top: 4px; }
+.plan-card .resolved.auto { color: var(--success); font-weight: 600; }
 
 .btn-primary {
   background: var(--accent);
@@ -436,6 +467,12 @@ button:focus-visible, input:focus-visible {
   font-size: 10px; font-weight: 700; border-radius: 999px;
   padding: 1px 7px; min-width: 20px; text-align: center;
 }
+.tq-autopilot {
+  background: var(--success-bg); color: var(--success);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 8px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
 .ticket-list {
   flex: 1; overflow-y: auto; padding: 8px;
   display: flex; flex-direction: column; gap: 4px;
@@ -455,6 +492,10 @@ button:focus-visible, input:focus-visible {
   border-color: rgba(247,144,9,0.3);
 }
 .ticket-card.status-resolved { opacity: 0.4; pointer-events: none; }
+.ticket-card.status-blocked {
+  background: var(--danger-bg);
+  border-color: rgba(240, 68, 56, 0.3);
+}
 
 .ticket-top { display: flex; align-items: flex-start; gap: 8px; }
 .ticket-priority-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
@@ -474,6 +515,7 @@ button:focus-visible, input:focus-visible {
 .ticket-status.open { background: var(--accent-subtle); color: var(--accent); }
 .ticket-status.in-progress { background: var(--warning-bg); color: var(--warning); }
 .ticket-status.resolved { background: var(--success-bg); color: var(--success); }
+.ticket-status.blocked { background: var(--danger-bg); color: var(--danger); }
 .ticket-handle-btn {
   font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
   background: var(--accent); color: #fff; border: none; font-weight: 600;

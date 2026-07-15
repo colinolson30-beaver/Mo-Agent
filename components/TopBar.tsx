@@ -4,10 +4,8 @@ import { useFleet } from "@/lib/store";
 
 export default function TopBar() {
   const stats = useFleet((s) => s.stats);
-
-  const debugWave = async () => {
-    await fetch("/api/debug/wave", { method: "POST" });
-  };
+  const autopilot = useFleet((s) => s.autopilot);
+  const setAutopilot = useFleet((s) => s.setAutopilot);
 
   return (
     <div className="topbar">
@@ -24,9 +22,13 @@ export default function TopBar() {
       <div className={`stat failed${stats.failed > 0 ? " nonzero" : ""}`}>
         <label>Failed</label><b>{stats.failed}</b>
       </div>
-      {/* Demo wave: runs the full rollout choreography with no AI involved */}
-      <button className="debug-btn" onClick={debugWave} title="Trigger a demo wave with no AI involved">
-        Demo wave
+      <button
+        className={`autopilot-toggle${autopilot ? " on" : ""}`}
+        onClick={() => setAutopilot(!autopilot)}
+        title="When on, Mo works the ticket queue and approves plans automatically"
+      >
+        <span className="track"><span className="knob" /></span>
+        Full Autopilot{autopilot ? " · On" : ""}
       </button>
     </div>
   );

@@ -1,66 +1,27 @@
 "use client";
 
-import { useState } from "react";
 import { useFleet } from "@/lib/store";
+import { TICKETS, type Ticket } from "@/lib/tickets";
 
-interface Ticket {
-  id: number;
-  title: string;
-  submitter: string;
-  priority: "high" | "medium" | "low";
-  prompt: string;
-}
-
-const TICKETS: Ticket[] = [
-  {
-    id: 1,
-    title: "Devices offline since spring break",
-    submitter: "Lincoln Middle · IT",
-    priority: "high",
-    prompt: "Which devices haven't checked in since spring break?",
-  },
-  {
-    id: 2,
-    title: "Chrome missing on 6th grade MacBooks",
-    submitter: "Maplewood Elementary · Mrs. Torres",
-    priority: "high",
-    prompt: "Push Google Chrome to the 6th grade carts",
-  },
-  {
-    id: 3,
-    title: "Lost MacBook — Room 110",
-    submitter: "Maplewood Elementary · Ms. Park",
-    priority: "medium",
-    prompt: "Lock device G5-C1-07, it's been reported lost",
-  },
-  {
-    id: 4,
-    title: "Push new district WiFi profile to Lincoln",
-    submitter: "District IT · Admin",
-    priority: "medium",
-    prompt: "Push the district WiFi profile to all Lincoln Middle devices",
-  },
-  {
-    id: 5,
-    title: "EOY: Factory reset entire district fleet",
-    submitter: "Superintendent · Dr. Nguyen",
-    priority: "low",
-    prompt: "Wipe every device in the district for end of year",
-  },
-];
-
-type TicketStatus = "open" | "in-progress" | "resolved";
+const STATUS_LABELS: Record<string, string> = {
+  open: "Open",
+  "in-progress": "In Progress",
+  resolved: "Resolved",
+  blocked: "Blocked",
+};
 
 export default function TicketQueue() {
-  const [statuses, setStatuses] = useState<Record<number, TicketStatus>>(() =>
-    Object.fromEntries(TICKETS.map((t) => [t.id, "open" as TicketStatus]))
-  );
+  const statuses = useFleet((s) => s.ticketStatuses);
+  const autopilot = useFleet((s) => s.autopilot);
   const setPendingPrompt = useFleet((s) => s.setPendingPrompt);
+  const setTicketStatus = useFleet((s) => s.setTicketStatus);
+  const setActiveTicketId = useFleet((s) => s.setActiveTicketId);
 
   const openCount = Object.values(statuses).filter((s) => s === "open").length;
 
   const handle = (ticket: Ticket) => {
-    setStatuses((prev) => ({ ...prev, [ticket.id]: "in-progress" }));
+    setTicketStatus(ticket.id, "in-progress");
+    setActiveTicketId(ticket.id);
     setPendingPrompt(ticket.prompt);
   };
 
@@ -68,6 +29,7 @@ export default function TicketQueue() {
     <div className="ticket-queue">
       <div className="ticket-queue-header">
         <h2>IT Tickets</h2>
+        {autopilot && <span className="tq-autopilot">Autopilot</span>}
         {openCount > 0 && <span className="tq-badge">{openCount}</span>}
       </div>
       <div className="ticket-list">
@@ -81,10 +43,8 @@ export default function TicketQueue() {
               </div>
               <div className="ticket-meta">{ticket.submitter}</div>
               <div className="ticket-footer">
-                <span className={`ticket-status ${status}`}>
-                  {status === "in-progress" ? "In Progress" : status === "open" ? "Open" : "Resolved"}
-                </span>
-                {status === "open" && (
+                <span className={`ticket-status ${status}`}>{STATUS_LABELS[status]}</span>
+                {status === "open" && !autopilot && (
                   <button className="ticket-handle-btn" onClick={() => handle(ticket)}>
                     Handle →
                   </button>

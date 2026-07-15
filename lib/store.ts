@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { Device, Group, Highlight, Plan, Stats } from "@/lib/sim/types";
+import { TICKETS, type TicketStatus } from "@/lib/tickets";
 
 interface FleetState {
   connected: boolean;
@@ -12,6 +13,12 @@ interface FleetState {
   highlight: Highlight;
   pendingPrompt: string | null;
   setPendingPrompt: (p: string | null) => void;
+  autopilot: boolean;
+  setAutopilot: (on: boolean) => void;
+  ticketStatuses: Record<number, TicketStatus>;
+  setTicketStatus: (id: number, status: TicketStatus) => void;
+  activeTicketId: number | null;
+  setActiveTicketId: (id: number | null) => void;
   connect: () => void;
 }
 
@@ -24,6 +31,13 @@ export const useFleet = create<FleetState>((set, get) => ({
   highlight: { deviceIds: [], kind: "none" },
   pendingPrompt: null,
   setPendingPrompt: (p) => set({ pendingPrompt: p }),
+  autopilot: false,
+  setAutopilot: (on) => set({ autopilot: on }),
+  ticketStatuses: Object.fromEntries(TICKETS.map((t) => [t.id, "open" as TicketStatus])),
+  setTicketStatus: (id, status) =>
+    set((state) => ({ ticketStatuses: { ...state.ticketStatuses, [id]: status } })),
+  activeTicketId: null,
+  setActiveTicketId: (id) => set({ activeTicketId: id }),
 
   connect: () => {
     if (get().connected || typeof window === "undefined") return;
